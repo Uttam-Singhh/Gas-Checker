@@ -174,7 +174,7 @@ export default function Home() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        Powered by Alchemy's{" "}
+        Powered by Alchemy&#39;s{" "}
         <a
           href="https://docs.alchemy.com/reference/get-historical-token-prices"
           target="_blank"
