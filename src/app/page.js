@@ -1,103 +1,198 @@
+"use client";
+
+import { useState } from "react";
+import { Bar } from "react-chartjs-2";
+import { motion } from "framer-motion";
 import Image from "next/image";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+} from "chart.js";
+
+// Register required modules for Chart.js.
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [address, setAddress] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [chartData, setChartData] = useState(null);
+  const [error, setError] = useState("");
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setResult(null);
+    setChartData(null);
+    if (!address) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/calculateGas?address=${address}`);
+      const data = await response.json();
+      if (response.ok) {
+        setResult(data);
+      } else {
+        setError(data.error || "Unknown error");
+      }
+    } catch (err) {
+      setError("Error fetching data");
+    }
+    setLoading(false);
+  };
+
+  const handleGenerateChart = () => {
+    if (result && result.transactionCosts && result.transactionCosts.length > 0) {
+      const labels = result.transactionCosts.map((tx) =>
+        new Date(Number(tx.timestamp)).toLocaleString()
+      );
+      const usdCosts = result.transactionCosts.map((tx) => tx.costUSD);
+      
+      const data = {
+        labels,
+        datasets: [
+          {
+            label: "Gas Cost (USD) per Transaction",
+            data: usdCosts,
+            backgroundColor: "rgba(54, 162, 235, 0.5)"
+          }
+        ]
+      };
+      setChartData(data);
+    }
+  };
+
+  // Framer Motion variants for animations.
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-indigo-900 via-purple-900 to-black">
+      {/* Header area with a contrasting background */}
+      <motion.div 
+        initial="hidden" 
+        animate="visible" 
+        variants={containerVariants}
+        className="flex items-center mb-8 p-4 bg-white bg-opacity-90 rounded shadow-lg"
+      >
+        <Image
+          src="/alchemy-logo-blue-gradient.svg"
+          alt="Alchemy Logo"
+          width={180}
+          height={60}
+        />
+        <h1 className="text-4xl font-bold ml-4 text-gray-800">Gas Checker App</h1>
+      </motion.div>
+
+      {/* Animated form */}
+      <motion.form 
+        onSubmit={handleSubmit}
+        className="w-full max-w-md bg-white bg-opacity-90 shadow-md rounded px-8 py-6 mb-8"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <label htmlFor="address" className="block text-gray-700 text-sm font-bold mb-2">
+          Wallet Address:
+        </label>
+        <input
+          id="address"
+          type="text"
+          placeholder="0x..."
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-4 focus:outline-none"
+        />
+        <button
+          type="submit"
+          className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-600"
+          disabled={loading}
+        >
+          {loading ? "Calculating..." : "Check Gas Usage"}
+        </button>
+      </motion.form>
+
+      {error && (
+        <motion.p 
+          className="text-red-500 mt-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          {error}
+        </motion.p>
+      )}
+
+      {result && (
+        <motion.div 
+          className="mt-4 p-6 bg-white bg-opacity-90 rounded shadow-md w-full max-w-md"
+          initial="hidden"
+          animate="visible"
+          variants={containerVariants}
+        >
+          <h2 className="text-2xl font-bold mb-4 text-gray-800">Your Gas Cost Summary</h2>
+          <p className="text-gray-700 mb-1">
+            <strong>Total Transactions:</strong> {result.transactionCosts ? result.transactionCosts.length : 0}
+          </p>
+          <p className="text-gray-700 mb-1">
+            <strong>Total Gas Cost:</strong> {result.totalGasCostWei} wei, {result.totalGasCostETH} ETH
+          </p>
+          <p className="text-gray-700 mb-4">
+            <strong>Total Gas Cost (USD):</strong> ${result.totalGasCostUSD}
+          </p>
+          <button
+            onClick={handleGenerateChart}
+            className="mt-4 w-full bg-green-500 text-white font-bold py-2 px-4 rounded hover:bg-green-600"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
+            Generate Chart
+          </button>
+        </motion.div>
+      )}
+
+      {chartData && (
+        <motion.div 
+          className="mt-6 w-full max-w-3xl bg-white bg-opacity-90 shadow-md rounded p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Bar data={chartData} options={{ plugins: { legend: { display: true } } }} />
+        </motion.div>
+      )}
+
+      {/* Footer with API credits and links */}
+      <motion.footer 
+        className="mt-8 text-sm text-white"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        Powered by Alchemy's{" "}
         <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+          href="https://docs.alchemy.com/reference/get-historical-token-prices"
           target="_blank"
           rel="noopener noreferrer"
+          className="text-blue-200 underline"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
+          Historical Token Prices API
+        </a>{" "}
+        and{" "}
         <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+          href="https://docs.alchemy.com/reference/get-transaction-history-by-address"
           target="_blank"
           rel="noopener noreferrer"
+          className="text-blue-200 underline"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
+          Transaction History By Address API
         </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </motion.footer>
     </div>
   );
 }
