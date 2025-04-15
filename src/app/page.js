@@ -75,7 +75,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-indigo-900 via-purple-900 to-black">
-      {/* Header area with a contrasting background */}
+      {/* Header area with contrasting background */}
       <motion.div 
         initial="hidden" 
         animate="visible" 
@@ -119,6 +119,22 @@ export default function Home() {
         </button>
       </motion.form>
 
+      {/* How It Works Section - Always Visible */}
+      <motion.div 
+        className="w-full max-w-md bg-white bg-opacity-90 rounded shadow-md px-8 py-4 mb-8"
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+      >
+        <h2 className="text-xl font-bold text-gray-800 mb-2">How It Works</h2>
+        <ul className="list-disc list-inside text-gray-700 text-sm">
+          <li>Uses the <a href="https://docs.alchemy.com/reference/get-transaction-history-by-address" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Transaction History By Address API</a> to fetch all transactions for a wallet.</li>
+          <li>Leverages the <a href="https://docs.alchemy.com/reference/get-historical-token-prices" target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">Historical Token Prices API</a> to get ETH prices at the transaction time.</li>
+          <li>Calculates gas cost in wei, converts it to ETH, and then computes the USD cost.</li>
+          <li>Provides a detailed breakdown for each transaction and an option to generate a chart.</li>
+        </ul>
+      </motion.div>
+
       {error && (
         <motion.p 
           className="text-red-500 mt-4"
@@ -139,7 +155,8 @@ export default function Home() {
         >
           <h2 className="text-2xl font-bold mb-4 text-gray-800">Your Gas Cost Summary</h2>
           <p className="text-gray-700 mb-1">
-            <strong>Total Transactions:</strong> {result.transactionCosts ? result.transactionCosts.length : 0}
+            <strong>Total Transactions:</strong>{" "}
+            {result.transactionCosts ? result.transactionCosts.length : 0}
           </p>
           <p className="text-gray-700 mb-1">
             <strong>Total Gas Cost:</strong> {result.totalGasCostWei} wei, {result.totalGasCostETH} ETH

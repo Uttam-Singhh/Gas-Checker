@@ -6,30 +6,39 @@ const NETWORK = 'eth-mainnet';
 const HISTORY_API_URL = `https://api.g.alchemy.com/data/v1/${API_KEY}/transactions/history/by-address`;
 
 /**
- * Fetch transaction history for the given address.
- * The API response returns transactions under the "transactions" key.
+ * Fetch transaction history for the given address using pagination.
+ * This function uses the "before" cursor returned from the API to fetch all pages.
  */
 async function fetchTransactionHistory(address) {
   let transactions = [];
   let hasMore = true;
-  let beforeCursor = undefined;
+  let cursor = undefined; // Renamed variable
+  let page = 1;
 
   while (hasMore) {
+    // Prepare the request payload with a limit (max 50)
     const data = {
       addresses: [{ address, networks: [NETWORK] }],
-      limit: 50 // Maximum allowed limit.
+      limit: 50
     };
-    if (beforeCursor) {
-      data.before = beforeCursor;
+    // If a cursor was returned, include it in the next request as "after"
+    if (cursor) {
+      data.after = cursor;
     }
+
+    console.log(`Fetching page ${page} with cursor: ${cursor || "none"}`);
 
     try {
       const response = await axios.post(HISTORY_API_URL, data);
-      const { transactions: txs, before } = response.data;
+
+      // Destructure the transactions array and the "after" cursor from the response.
+      const { transactions: txs, after } = response.data;
+
       if (txs && Array.isArray(txs) && txs.length > 0) {
         transactions = transactions.concat(txs);
-        if (before) {
-          beforeCursor = before;
+        if (after) {
+          cursor = after;
+          page++;
         } else {
           hasMore = false;
         }
@@ -41,12 +50,13 @@ async function fetchTransactionHistory(address) {
       throw error;
     }
   }
+  console.log(`Total transactions fetched: ${transactions.length}`);
   return transactions;
 }
 
 /**
  * Fetch the historical USD price for ETH at a given timestamp.
- * We query a 1-hour window (from timestamp to timestamp+3600000ms) using an interval of "1h".
+ * We query a 1-hour window (from the timestamp to timestamp+3600000ms) using an interval of "1h".
  */
 async function fetchHistoricalETHPrice(timestamp) {
   const startDate = new Date(Number(timestamp));
@@ -55,7 +65,7 @@ async function fetchHistoricalETHPrice(timestamp) {
   const endTime = endDate.toISOString();
 
   const body = {
-    symbol: "ETH",       // Use "symbol" as required by the endpoint.
+    symbol: "ETH",
     startTime: startTime,
     endTime: endTime,
     interval: "1h"
@@ -83,7 +93,8 @@ async function fetchHistoricalETHPrice(timestamp) {
 /**
  * Calculate the total gas cost for an address.
  * For each transaction, we compute the cost (in wei and ETH) and attempt to fetch its historical USD price.
- * We accumulate an array of per-transaction details.
+ * If a historical price isn't found for a transaction, the code uses the last valid price.
+ * Returns overall totals and a breakdown per transaction.
  */
 async function calculateTotalGasCost(address) {
   const transactions = await fetchTransactionHistory(address);
@@ -92,18 +103,14 @@ async function calculateTotalGasCost(address) {
   let totalGasCostETH = 0.0;
   let totalGasCostUSD = 0.0;
   let txCosts = [];
-
-  // Maintain the last valid historical price.
   let lastValidPrice = null;
 
   for (const tx of transactions) {
-    // Use tx.gasUsed or fallback to tx.gas if not available.
     const gasUsedValue = tx.gasUsed || tx.gas;
     if (!gasUsedValue) {
       console.warn(`Transaction ${tx.hash} missing gasUsed/gas, skipping.`);
       continue;
     }
-    // Use effectiveGasPrice if available; fallback to gasPrice.
     const gasPriceValue = tx.effectiveGasPrice || tx.gasPrice;
     if (!gasPriceValue) {
       console.warn(`Transaction ${tx.hash} missing effectiveGasPrice/gasPrice, skipping.`);
@@ -122,7 +129,6 @@ async function calculateTotalGasCost(address) {
       }
 
       let histPriceUSD = await fetchHistoricalETHPrice(tx.blockTimestamp);
-      // If the historical price is not found, use the last valid price if available.
       if (histPriceUSD === null) {
         if (lastValidPrice !== null) {
           histPriceUSD = lastValidPrice;
@@ -132,7 +138,6 @@ async function calculateTotalGasCost(address) {
           continue;
         }
       } else {
-        // Update lastValidPrice if this transaction returns a valid historical price.
         lastValidPrice = histPriceUSD;
       }
 
